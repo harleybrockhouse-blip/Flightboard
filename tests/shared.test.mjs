@@ -9,3 +9,20 @@ test('shared records disabled returns local-mode indicator',async()=>{const hand
 test('shared read merges corrections without changing original detection',async()=>{const s=memory();await s.setJSON(`days/${day}`,[flight]);await s.setJSON('corrections/ABC-123',{registration:'G-FIXED',landingAt:now-1000});const handler=createRecordsHandler(()=>s,()=>true);const result=await(await handler(new Request(`https://board.test?day=${day}`))).json();assert.equal(result.flights[0].registration,'G-FIXED');assert.equal(s.data.get(`days/${day}`)[0].registration,'G-TEST')});
 test('shared edits require key, validate data, and reject stale concurrent edits',async()=>{process.env.FLIGHTBOARD_EDIT_KEY='test-secret';const s=memory();await s.setJSON(`days/${day}`,[flight]);const handler=createRecordsHandler(()=>s,()=>true);const body={id:flight.id,patch:{registration:'G-TEST',origin:'BRENTOR',takeoffAt:flight.takeoffAt,landingAt:now-1000,note:'Launch log checked'},expectedEditedAt:null};assert.equal((await handler(request(body,'wrong'))).status,401);assert.equal((await handler(request({...body,patch:{...body.patch,landingAt:1}}))).status,400);assert.equal((await handler(request(body))).status,200);assert.equal((await handler(request(body))).status,409);const saved=s.data.get(`days/${day}`)[0];assert.equal(saved.landingAt,null)});
 test('collector persists records and skips when another invocation holds the lease',async()=>{const s=memory();await s.setJSON('collector-lease',{until:now+999999});let fetches=0;const collector=createCollector(()=>s,()=>true,async()=>{fetches++;return {aircraft:[]}});await collector();assert.equal(fetches,0);await s.setJSON('collector-lease',{until:0});await collector();assert.equal(fetches,1);assert.ok(s.data.get('tracker'));assert.equal(s.data.get('collector-lease').until,0)});
+
+
+test('server collection and reads work without an opt-in environment variable',async()=>{
+ const previous=process.env.FLIGHTBOARD_SHARED;
+ try{
+  delete process.env.FLIGHTBOARD_SHARED;
+  const s=memory();let fetches=0;
+  await createCollector(()=>s,undefined,async()=>{fetches++;return {aircraft:[]}})();
+  assert.equal(fetches,1);assert.ok(s.data.get('tracker'));
+  const result=await(await createRecordsHandler(()=>s)(new Request('https://board.test'))).json();
+  assert.equal(result.enabled,true);
+  process.env.FLIGHTBOARD_SHARED='false';
+  await createCollector(()=>s,undefined,async()=>{fetches++;return {aircraft:[]}})();
+  assert.equal(fetches,1);
+  assert.deepEqual(await(await createRecordsHandler(()=>s)(new Request('https://board.test'))).json(),{enabled:false});
+ }finally{if(previous===undefined)delete process.env.FLIGHTBOARD_SHARED;else process.env.FLIGHTBOARD_SHARED=previous;}
+});
