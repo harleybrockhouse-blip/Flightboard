@@ -129,3 +129,22 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden){poll();fe
 
 document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&document.body.classList.contains('display-mode')){document.body.classList.remove('display-mode');$('display').textContent='Display mode ↗';rotate(false);wakeLock?.release();requestAnimationFrame(()=>map?.invalidateSize())}});
 
+
+$('serverHistory').onclick=async()=>{
+ const button=$('serverHistory');button.disabled=true;
+ try{
+  if(demo)throw Error('Server history is available in live mode.');
+  const base=`/.netlify/functions/history?airfield=${airfield.id}`;
+  const readHistory=async url=>{const response=await fetch(url,{cache:'no-store',signal:AbortSignal.timeout(20000)});if(!response.ok)throw Error('Server history unavailable. Try again after deployment.');return response.json()};
+  const status=await readHistory(base);
+  if(!status.enabled)throw Error('Server recording is disabled.');
+  if(!status.availableHours.length)throw Error('No server tracks yet. Allow a minute after deployment.');
+  const snapshots=[];
+  for(const [i,hour] of status.availableHours.entries()){
+   button.textContent=`Downloading ${i+1}/${status.availableHours.length}`;
+   snapshots.push(...(await readHistory(`${base}&hour=${hour}`)).snapshots);
+  }
+  download(`${airfield.id}-server-tracks-${today()}.json`,JSON.stringify({version:1,airfield:airfield.id,exportedAt:new Date().toISOString(),retentionDays:7,sampleSeconds:60,attribution:'Open Glider Network and ADS-B.lol (ODbL 1.0)',snapshots}), 'application/json');
+  toast('Server tracks downloaded. Keep this archive to retain them beyond seven days.');
+ }catch(error){toast(error.message)}finally{button.disabled=false;button.textContent='↓ Server tracks · 7 days'}
+};

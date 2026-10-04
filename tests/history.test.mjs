@@ -1,0 +1,30 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {saveHistory,RETENTION_MS,HOUR_MS,historyKey} from '../lib/history.mjs';
+import {createHistoryHandler} from '../netlify/functions/history.mjs';
+const memory=()=>{const data=new Map();return {data,get:async key=>data.get(key)||null,setJSON:async(key,value)=>data.set(key,value),delete:async key=>data.delete(key),list:async()=>({blobs:[...data.keys()].filter(key=>key.startsWith('positions/')).map(key=>({key}))})}};
+test('seven-day archive retains positions, replaces retry minute and prunes only expired positions',async()=>{
+ const s=memory(),now=1791127500000,cutoff=now-RETENTION_MS;
+ await s.setJSON(historyKey(cutoff-HOUR_MS),[{at:cutoff-HOUR_MS}]);
+ await s.setJSON(historyKey(cutoff),[{at:cutoff-1},{at:cutoff+1}]);
+ await s.setJSON('days/2026-01-01',[{id:'keep-summary'}]);
+ const feed={sources:[{name:'ADSB',ok:true}],aircraft:[{deviceId:'abc',lat:50,lon:-4}]};
+ await saveHistory(s,feed,now);await saveHistory(s,feed,now+1000);
+ assert.equal(await s.get(historyKey(cutoff-HOUR_MS)),null);
+ assert.deepEqual(await s.get(historyKey(cutoff)),[]);
+ assert.equal((await s.get(historyKey(now))).length,1);
+ assert.deepEqual((await s.get(historyKey(now)))[0].aircraft,feed.aircraft);
+ assert.ok(await s.get('days/2026-01-01'));
+});
+test('history reads isolate airfields and enforce expiry even without cleanup',async()=>{
+ const now=1791127500000,stores={brentor:memory(),predannack:memory()};
+ await stores.brentor.setJSON(historyKey(now),[{at:now-1000,aircraft:[{deviceId:'abc'}]}]);
+ const handler=createHistoryHandler(id=>stores[id],()=>true,()=>now);
+ const get=q=>handler(new Request('https://board.test/?'+q));
+ assert.equal((await(await get('airfield=brentor')).json()).availableHours.length,1);
+ assert.equal((await(await get('airfield=predannack')).json()).availableHours.length,0);
+ assert.equal((await(await get(`hour=${Math.floor(now/HOUR_MS)*HOUR_MS}`)).json()).snapshots.length,1);
+ assert.equal((await get(`hour=${Math.floor((now-RETENTION_MS-HOUR_MS)/HOUR_MS)*HOUR_MS}`)).status,410);
+ assert.equal((await get('hour=banana')).status,400);
+ assert.equal((await get('airfield=unknown')).status,400);
+});

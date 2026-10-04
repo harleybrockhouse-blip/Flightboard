@@ -125,3 +125,9 @@ Data attribution: ADS-B.lol https://www.adsb.lol/ ; public API https://api.adsb.
 ## Recording with the browser closed
 
 A published Netlify production build runs the collector once per minute for both airfields and stores flights and daily totals in Netlify Blobs. Closing the dashboard does not stop this scheduled function. Open the dashboard on another device to read the same server records. Collection begins after deployment; existing browser-only records and imported historical traces are not automatically uploaded or backfilled. Local development still uses browser recording.
+
+## Seven-day server position archive
+
+The scheduled collector also stores time-stamped aircraft position snapshots from ADS-B (Automatic Dependent Surveillance–Broadcast) and OGN (Open Glider Network), independently of browsers. Both airfields have separate hourly objects in their existing persistent Netlify store. Snapshots are sampled once per minute, with upstream source status retained. Each successful collection deletes expired position objects and trims the boundary hour to a rolling seven-day window. Flight summaries and corrections retain their existing longer retention. Feed outages cause gaps; one airfield failing does not prevent the other collector running.
+
+Flight log → Server tracks · 7 days downloads the available position archive as JSON. This preserves raw snapshots beyond server retention for subsequent reconstruction; this download is not the per-aircraft readsb import format and there is no built-in playback screen. GET /.netlify/functions/history?airfield=brentor lists available hours; append &hour=<epoch milliseconds> to retrieve one hour. Reads enforce seven-day expiry even if collection is interrupted. Collection begins at deployment, with no automatic historical backfill. No browser is required for collection or retention cleanup.
