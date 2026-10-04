@@ -1,0 +1,17 @@
+{
+  "name": "brentor-flightboard",
+  "version": "0.6.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "dev": "node dev.mjs",
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@netlify/blobs": "^10.0.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
