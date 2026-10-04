@@ -13,13 +13,14 @@ export class Tracker {
   const c=this.cfg;
   for(const a of aircraft){
    if(!a.deviceId||!Number.isFinite(a.reportAt)||a.reportAt>now+5000||now-a.reportAt>c.freshMs||!Number.isFinite(a.lat)||!Number.isFinite(a.lon))continue;
-   const id=a.deviceId,ts=a.reportAt;
+   let id=a.deviceId;const ts=a.reportAt;
+   if(!this.tracks[id]&&a.registration){const registration=a.registration.replace(/[^a-z0-9]/gi,'').toUpperCase();const alias=Object.values(this.tracks).find(t=>t.last?.registration?.replace(/[^a-z0-9]/gi,'').toUpperCase()===registration&&Math.abs(ts-t.lastReportAt)<c.lostMs&&distance(a.lat,a.lon,t.last.lat,t.last.lon)<3000);if(alias){id=alias.id;a.deviceId=id;}}
    let t=this.tracks[id];
    if(!t)t=this.tracks[id]={id,lastReportAt:0,groundAt:0,launch:null,land:null,flightId:null,trail:[]};
    if(ts<=t.lastReportAt+3000)continue;
    const gap=ts-t.lastReportAt;
    if(gap>c.lostMs){t.launch=null;t.land=null;t.groundAt=0;}
-   const h=Number.isFinite(a.altitudeM)?a.altitudeM-c.elevationM:null;
+   const h=a.onGround===true?0:Number.isFinite(a.altitudeM)?a.altitudeM-c.elevationM:null;
    const speed=a.speedKmh;
    const ground=inside(a,c)&&Number.isFinite(speed)&&speed<=c.landingSpeedKmh&&h!==null&&h<=c.landingHeightM;
    const flying=Number.isFinite(speed)&&h!==null&&speed>=c.takeoffSpeedKmh&&h>=c.takeoffHeightM;
@@ -31,12 +32,12 @@ export class Tracker {
      if(!t.launch)t.launch={at:ts,count:0,origin:t.groundAt&&ts-t.groundAt<180000?(c.origin||'BRENTOR'):'VISITOR'};
      t.launch.count++;
      if(t.launch.count>=2){
-      f={id:`${id}-${t.launch.at}`,deviceId:id,registration:nameOf(a),cn:a.cn||'',takeoffAt:t.launch.at,landingAt:null,lastReportAt:ts,maxAltM:a.altitudeM,referenceElevationM:c.elevationM,origin:t.launch.origin,status:'AIRBORNE',estimatedTakeoff:true,estimatedLanding:false};
+      f={id:`${id}-${t.launch.at}`,deviceId:id,registration:nameOf(a),cn:a.cn||'',takeoffAt:t.launch.at,landingAt:null,lastReportAt:ts,maxAltM:a.altitudeM,referenceElevationM:c.elevationM,origin:t.launch.origin,status:'AIRBORNE',estimatedTakeoff:true,estimatedLanding:false,source:a.source||'OGN',sources:a.sources||['OGN']};
       this.flights.push(f);t.flightId=f.id;t.launch=null;t.groundAt=0;
      }
     }else t.launch=null;
    }else{
-    f.lastReportAt=ts;f.status='AIRBORNE';f.maxAltM=Math.max(f.maxAltM??a.altitudeM??0,a.altitudeM??0);
+    f.lastReportAt=ts;f.sources=[...new Set([...(f.sources||['OGN']),...(a.sources||['OGN'])])];f.status='AIRBORNE';f.maxAltM=Math.max(f.maxAltM??a.altitudeM??0,a.altitudeM??0);
     if(ground){
      if(!t.land)t.land={at:ts,count:0};t.land.count++;
      if(t.land.count>=2&&ts-t.land.at>=15000){f.landingAt=t.land.at;f.status='LANDED';f.estimatedLanding=true;t.flightId=null;t.groundAt=ts;t.land=null;}
@@ -56,3 +57,4 @@ export function validateCorrection(p){
  return {registration:p.registration.trim(),takeoffAt:p.takeoffAt,landingAt:p.landingAt,origin:p.origin,note:String(p.note||'').slice(0,300),manual:true,editedAt:Date.now()};
 }
 export function corrected(f,p){return p?{...f,...p,status:p.landingAt?'LANDED':f.status}:f;}
+

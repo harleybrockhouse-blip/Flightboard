@@ -1,9 +1,5 @@
-# Flightboard v0.6 validation
+# Flightboard v0.7 validation
 
-- 23 deterministic tests pass: feed parser, launch/landing detection, short flights, stale/repeated reports, lost signals, refresh recovery, correction validation, concurrent shared edits, leases, Predannack launch origin, separate record stores, and selected weather model/coordinates.
-- npm run build passes JavaScript syntax checks for browser and server code.
-- Weather routing tests use mocked upstream responses; live provider availability is not guaranteed.
-- Automatic flights remain estimates and require available Open Glider Network reports. Aircraft without received transmissions are absent. Browser-only recording needs an open page. Shared scheduled recording requires Netlify setup and can miss short ground/flight phases.
-- Older v0.5 previews are superseded by v06 previews when included.
+29 tests pass, covering original flight tracking/shared recording plus ADS-B field conversion, position age, source degradation, cross-source duplicate merging, source-switch continuity, historical launch/landing reconstruction, repeated imports, off-area traces and distinct short flights. JavaScript syntax build checks pass. Live ADS-B.lol request succeeded for Brentor (3 aircraft at time of check).
 
-Final browser visual checks could not run in this environment because the browser executable was unavailable and its download failed. Existing v0.5 previews have been removed to avoid presenting them as v0.6 screenshots.
+Browser visual verification was unavailable in this execution environment. Historical imports are local, read-only, estimated, and need a per-aircraft trace from the provider archive. No automatic comprehensive historical backfill is implemented. Shared collection requires Netlify environment setup. Netlify deployment completion is not yet confirmed.

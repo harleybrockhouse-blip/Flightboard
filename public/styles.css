@@ -7,3 +7,6 @@
 .map-panel.fallback-dark .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.82) saturate(.6)}
 
 .airfield-select select{max-width:145px;font-weight:600}.provider-select{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--muted)}.provider-select select{max-width:340px} @media(max-width:760px){.topbar{flex-wrap:wrap}.airfield-select{margin-left:auto}.provider-select select{max-width:100%;width:100%}.page-heading{flex-wrap:wrap;gap:16px}}
+
+
+#sourceStatus{font-size:11px;max-width:170px;overflow-wrap:anywhere}.log-stats{flex-wrap:wrap}@media(max-width:760px){#sourceStatus{max-width:125px}}

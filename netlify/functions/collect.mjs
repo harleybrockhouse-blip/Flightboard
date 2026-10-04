@@ -1,9 +1,9 @@
 import {AIRFIELDS} from '../../public/airfields.mjs';
 import {Tracker,dayKey} from '../../public/tracker.mjs';
-import {fetchOgn} from '../../lib/ogn.mjs';
+import {fetchTraffic} from '../../lib/traffic.mjs';
 import {enabled,store} from '../../lib/store.mjs';
 export const config={schedule:'* * * * *'};
-export const createCollector=(getStore=store,isEnabled=enabled,getFeed=fetchOgn,airfield=AIRFIELDS.brentor)=>async()=>{
+export const createCollector=(getStore=store,isEnabled=enabled,getFeed=fetchTraffic,airfield=AIRFIELDS.brentor)=>async()=>{
  if(!isEnabled())return new Response(null,{status:204});
  const s=getStore(airfield.id),now=Date.now();
  // A conditional lease prevents overlapping scheduled invocations from racing.
@@ -25,4 +25,5 @@ export const createCollector=(getStore=store,isEnabled=enabled,getFeed=fetchOgn,
  return new Response(null,{status:204});
 };
 
-export default async()=>{for(const airfield of Object.values(AIRFIELDS))await createCollector(store,enabled,fetchOgn,airfield)();return new Response(null,{status:204});};
+export default async()=>{for(const airfield of Object.values(AIRFIELDS))await createCollector(store,enabled,fetchTraffic,airfield)();return new Response(null,{status:204});};
+

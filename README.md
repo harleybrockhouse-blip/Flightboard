@@ -108,3 +108,16 @@ Conditions offers Open-Meteo automatic blend, UK Met Office seamless model, and 
 The shared collector records both airfields in separate stores. Use FLIGHTBOARD_CONFIG for Brentor and FLIGHTBOARD_PREDANNACK_CONFIG for Predannack, each containing optional JSON detection overrides. Keep lat/lon and origin consistent with the airfield. Shared corrections reject an origin from the other airfield.
 
 Start: npm ci, then npm run dev. Open http://localhost:4173 . For illustrative aircraft, open http://localhost:4173/?demo=1 (demo records are never saved). A plain file:// opening cannot run the server feeds. Deploy the complete project as described above for live data.
+
+
+## v0.7 ADS-B and historical traces
+
+The aircraft endpoint now merges Open Glider Network (OGN) and ADS-B.lol Automatic Dependent Surveillance–Broadcast (ADS-B) traffic, with independent source status and graceful degradation if one source is unavailable. Nearby matching registrations/device identities are merged; tracking retains identities on a source change. ADS-B altitude is converted from feet, ground speed from knots, and report freshness uses seen_pos. Explicit ground reports can confirm ground height, but still need position and speed evidence. ADS-B.lol may also provide multilateration or other position methods; the source label does not imply every report is direct ADS-B.
+
+Both feeds contribute to local and optional shared flight detection and daily totals. Visitors remain separate from airfield launches. Existing records remain available in their previous storage locations. Shared collection still requires FLIGHTBOARD_SHARED=true on Netlify; it is not enabled by this commit.
+
+Flight log → Import historical trace accepts an ADS-B.lol/readsb per-aircraft JSON or gzip JSON trace, up to 10 MB compressed/input size and 100,000 trace points. Download and extract a per-aircraft file from the provider archive: https://www.adsb.lol/docs/open-data/historical/ . Traces outside 25 nautical miles of the selected airfield are discarded. Reports are replayed in timestamp order to estimate launches/landings. A selected historical flight draws an amber route on the map. Imported flights are labelled Historical, read-only, de-duplicated against overlapping local/shared records, and included in daily totals, CSV exports and Backup. Imports are local to the current browser, including when shared logging is enabled. They do not overwrite the server's records.
+
+No automatic all-aircraft historical backfill is claimed: the provider supplies daily archive downloads rather than a simple historical airfield query. Missing ground reports cannot prove an airfield departure or landing. Importing the same trace twice does not count it twice. Previous-day local/shared recorded flights remain available using the date selector.
+
+Data attribution: ADS-B.lol https://www.adsb.lol/ ; public API https://api.adsb.lol/docs . Historical provider data is under Open Database License (ODbL) 1.0 as documented by the provider. Retain attribution and comply with its data licence when redistributing derived databases.
