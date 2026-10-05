@@ -1,3 +1,4 @@
+import {enrichIdentities} from '../../lib/identity.mjs';
 import {resolveAirfield} from '../../public/airfields.mjs';
 import {enabled,store} from '../../lib/store.mjs';
 import {dayKey,validateCorrection,corrected} from '../../public/tracker.mjs';
@@ -7,15 +8,15 @@ const reply=(data,status=200)=>Response.json(data,{status,headers:{'cache-contro
 export const createRecordsHandler=(getStore=store,isEnabled=enabled)=>async(req)=>{
  if(!isEnabled())return reply({enabled:false});
  try{
- const u=new URL(req.url),airfield=resolveAirfield(u.searchParams.get('airfield'));if(!airfield)return reply({error:'Unknown airfield'},400);const s=getStore(airfield.id),day=u.searchParams.get('day')||dayKey();
- if(!/^\d{4}-\d{2}-\d{2}$/.test(day))return reply({error:'Invalid date'},400);
+ const u=new URL(req.url),airfield=resolveAirfield(u.searchParams.get('airfield'));if(!airfield)return reply({error:'Unknown airfield'},400);const s=getStore(airfield.id),day=u.searchParams.get('day')||dayKey();const count=Number(u.searchParams.get('days')||1);if(!Number.isInteger(count)||count<1||count>7)return reply({error:'Choose between one and seven days'},400);
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(day)||!Number.isFinite(Date.parse(day+'T12:00:00Z'))||new Date(day+'T12:00:00Z').toISOString().slice(0,10)!==day)return reply({error:'Invalid date'},400);
  if(req.method==='GET'){
-  const [flights,snapshot]=await Promise.all([s.get(`days/${day}`,{type:'json'}),s.get('tracker',{type:'json'})]);
+  const dates=Array.from({length:count},(_,i)=>new Date(Date.parse(day+'T12:00:00Z')-i*86400000).toISOString().slice(0,10));const [archives,snapshot]=await Promise.all([Promise.all(dates.map(date=>s.get(`days/${date}`,{type:'json'}))),s.get('tracker',{type:'json'})]);const flights=archives.flatMap(a=>a||[]);
   const fs=await Promise.all((flights||[]).map(async f=>{
    const last=snapshot?.tracks?.[f.deviceId]?.last;const evidence={...f,vehicleType:f.vehicleType??last?.vehicleType,emitterCategory:f.emitterCategory||last?.emitterCategory,aircraftType:f.aircraftType||last?.aircraftType};
    const result=corrected(evidence,await s.get(`corrections/${f.id}`,{type:'json'})),c=classify(result);return {...result,aircraftKind:c.kind,kindReason:c.reason};
   }));
-  return reply({enabled:true,flights:fs,updatedAt:snapshot?.updatedAt||0,editingAvailable:!!process.env.FLIGHTBOARD_EDIT_KEY});
+  const identified=await enrichIdentities(fs);return reply({enabled:true,flights:identified,days:dates,updatedAt:snapshot?.updatedAt||0,editingAvailable:!!process.env.FLIGHTBOARD_EDIT_KEY});
  }
  if(req.method!=='POST')return reply({error:'Method not allowed'},405);
  const secret=process.env.FLIGHTBOARD_EDIT_KEY||'',provided=req.headers.get('authorization')?.replace(/^Bearer /,'')||'';

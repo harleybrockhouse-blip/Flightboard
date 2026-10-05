@@ -1,4 +1,4 @@
-# Brentor / Predannack Flightboard v0.8
+# Brentor / Predannack Flightboard v0.9
 
 A responsive aircraft monitoring and flight logging board for Brentor and Predannack, with an aircraft map, live activity, daily records and model weather.
 
@@ -141,3 +141,11 @@ Classification retains OGN vehicle type, ADS-B emitter category and aircraft typ
 Review a probable flight with Edit → Aircraft classification. Shared corrections require FLIGHTBOARD_EDIT_KEY on Netlify and the same key entered in Settings. Glider/other/unclassified review choices persist as authenticated correction overlays, survive source changes and are reflected in the daily totals. Choose Use feed classification to clear a manual review. Aircraft classification does not change origin, departure time or landing evidence. Existing archived records without aircraft metadata remain unclassified or probable according to their available evidence.
 
 Glide and Seek is an OGN tracking viewer, so its underlying network is already used rather than counted twice. Flightradar24 and UKAFG are reference links only: no credentials, paid API subscription or documented reusable UKAFG position feed have been supplied. The site does not imply these are connected sources or scrape their private interfaces. Source status identifies the providers actually queried.
+
+## Daily glider logbook (v0.9)
+
+The logbook defaults to Gliders only with All departures, so gliders first seen airborne remain visible. Aircraft filters distinguish gliders, probable gliders, powered/other and unclassified. Filter by departure evidence, status and aircraft search. Previous/next buttons browse daily flights; Daily totals shows seven dates ending on the selected date, including days without matching records. Clicking a date opens its flights. CSV export uses the active filters. No matching records means absent/incomplete coverage, not proof of no activity.
+
+OGN device-registry enrichment uses public registration lookups, honours TRACKED and IDENTIFIED flags, caches responses, and retains model/type evidence in new server records. G-DDNE and G-DDSL have verified public registry seed entries from 5 October 2026, so old Brentor records can be identified immediately when upstream lookup fails. PDANNACK GLIM is recognised as a glider identity supplied by the user; this does not manufacture flights or establish a Predannack departure. Manual review takes precedence over registry classification.
+
+Recording began during the afternoon of 4 October 2026. The Saturday 3 October Predannack server archive is empty. Historical OGN FlightBook and LogBook airfield-name lookups did not return these airfields; no historical flights are invented or backfilled by this release. Earlier flight recovery requires accessible historical telemetry or an actual launch log.

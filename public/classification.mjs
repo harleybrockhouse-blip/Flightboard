@@ -1,6 +1,11 @@
 export const KINDS=['glider','probable','other','unknown'];
 export function classify(a={}){
  if(['glider','other','unknown'].includes(a.confirmedKind))return {kind:a.confirmedKind,reason:'Manually reviewed',reviewed:true};
+ const labels=[a.registration,a.cn,a.deviceId,a.name,[a.registration,a.cn].filter(Boolean).join(' ')].map(s=>String(s||'').replace(/[^a-z0-9]/gi,'').toUpperCase());
+ if(labels.includes('PDANNACKGLIM'))return {kind:'glider',reason:'User-confirmed Predannack glider identity: PDANNACK GLIM'};
+ const registry=String(a.registryType||'');
+ if(registry==='1')return {kind:'glider',reason:'OGN device registry identifies glider / motor glider'};
+ if(/^[2-6]$/.test(registry))return {kind:'other',reason:'OGN device registry identifies another aircraft type'};
  const v=String(a.vehicleType??''),category=String(a.emitterCategory||'').toUpperCase();
  const glider=v==='1'||category==='B1';
  const other=(/^(2|3|4|5|6|7|8|9|10|11|12|13|15)$/.test(v))||/^A[1-7]$|^B[2-7]$|^C[1-7]$/.test(category);

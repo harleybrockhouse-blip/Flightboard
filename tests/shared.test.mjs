@@ -37,3 +37,11 @@ test('shared aircraft confirmation requires authentication and is recovered on l
  assert.equal(result.flights[0].confirmedKind,'glider');assert.equal(result.flights[0].aircraftKind,'glider');assert.equal(result.flights[0].origin,'VISITOR');
  assert.equal(s.data.get(`days/${day}`)[0].confirmedKind,undefined);
 });
+test('seven-day logbook loads each date, retains visitor gliders, and rejects invalid ranges',async()=>{
+ const s=memory(),end='2026-10-05';await s.setJSON('days/2026-10-04',[{...flight,id:'sunday',registration:'G-DDSL',sources:['OGN'],origin:'VISITOR',takeoffAt:Date.parse('2026-10-04T14:00:00Z')}]);
+ const handler=createRecordsHandler(()=>s,()=>true);
+ const result=await(await handler(new Request(`https://board.test?day=${end}&days=7`))).json();
+ assert.equal(result.days.length,7);assert.equal(result.flights.length,1);assert.equal(result.flights[0].aircraftKind,'glider');assert.equal(result.flights[0].origin,'VISITOR');
+ assert.equal((await handler(new Request('https://board.test?day=2026-02-30'))).status,400);
+ assert.equal((await handler(new Request('https://board.test?days=8'))).status,400);
+});

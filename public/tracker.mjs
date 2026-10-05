@@ -44,7 +44,7 @@ export class Tracker {
      if(t.land.count>=2&&ts-t.land.at>=15000){f.landingAt=t.land.at;f.status='LANDED';f.estimatedLanding=true;t.flightId=null;t.groundAt=ts;t.land=null;}
     }else t.land=null;
    }
-   if(f){const evidence={vehicleType:a.vehicleType??f.vehicleType??t.last?.vehicleType,emitterCategory:a.emitterCategory||f.emitterCategory||t.last?.emitterCategory,aircraftType:a.aircraftType||f.aircraftType||t.last?.aircraftType,sources:f.sources};const kind=classify(evidence);Object.assign(f,evidence,{aircraftKind:kind.kind,kindReason:kind.reason});}
+   if(f){const evidence={registryType:a.registryType||f.registryType||t.last?.registryType,identitySource:a.identitySource||f.identitySource,vehicleType:a.vehicleType??f.vehicleType??t.last?.vehicleType,emitterCategory:a.emitterCategory||f.emitterCategory||t.last?.emitterCategory,aircraftType:a.aircraftType||f.aircraftType||t.last?.aircraftType,sources:f.sources};const kind=classify(evidence);Object.assign(f,evidence,{aircraftKind:kind.kind,kindReason:kind.reason});}
    t.lastReportAt=ts;t.last=a;t.trail.push([a.lat,a.lon,ts]);t.trail=t.trail.filter(p=>ts-p[2]<600000).slice(-80);
   }
   this.tick(now);this.updatedAt=now;
