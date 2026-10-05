@@ -1,6 +1,7 @@
 import {resolveAirfield} from '../../public/airfields.mjs';
 import {enabled,store} from '../../lib/store.mjs';
 import {dayKey,validateCorrection,corrected} from '../../public/tracker.mjs';
+import {classify} from '../../public/classification.mjs';
 import {timingSafeEqual} from 'node:crypto';
 const reply=(data,status=200)=>Response.json(data,{status,headers:{'cache-control':'no-store'}});
 export const createRecordsHandler=(getStore=store,isEnabled=enabled)=>async(req)=>{
@@ -10,7 +11,10 @@ export const createRecordsHandler=(getStore=store,isEnabled=enabled)=>async(req)
  if(!/^\d{4}-\d{2}-\d{2}$/.test(day))return reply({error:'Invalid date'},400);
  if(req.method==='GET'){
   const [flights,snapshot]=await Promise.all([s.get(`days/${day}`,{type:'json'}),s.get('tracker',{type:'json'})]);
-  const fs=await Promise.all((flights||[]).map(async f=>corrected(f,await s.get(`corrections/${f.id}`,{type:'json'}))));
+  const fs=await Promise.all((flights||[]).map(async f=>{
+   const last=snapshot?.tracks?.[f.deviceId]?.last;const evidence={...f,vehicleType:f.vehicleType??last?.vehicleType,emitterCategory:f.emitterCategory||last?.emitterCategory,aircraftType:f.aircraftType||last?.aircraftType};
+   const result=corrected(evidence,await s.get(`corrections/${f.id}`,{type:'json'})),c=classify(result);return {...result,aircraftKind:c.kind,kindReason:c.reason};
+  }));
   return reply({enabled:true,flights:fs,updatedAt:snapshot?.updatedAt||0,editingAvailable:!!process.env.FLIGHTBOARD_EDIT_KEY});
  }
  if(req.method!=='POST')return reply({error:'Method not allowed'},405);
@@ -33,3 +37,4 @@ export const createRecordsHandler=(getStore=store,isEnabled=enabled)=>async(req)
 };
 
 export default createRecordsHandler();
+

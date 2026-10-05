@@ -1,3 +1,4 @@
+import {classify} from './classification.mjs';
 export const DEFAULTS = {lat:50.592183,lon:-4.151667,elevationM:250,radiusM:850,takeoffSpeedKmh:38,takeoffHeightM:30,landingSpeedKmh:25,landingHeightM:35,freshMs:90000,lostMs:120000,polygon:[]};
 export const dayKey=(ts=Date.now())=>new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/London',year:'numeric',month:'2-digit',day:'2-digit'}).format(ts);
 export function distance(a,b,c,d){const rad=x=>x*Math.PI/180;const q=Math.sin(rad(c-a)/2)**2+Math.cos(rad(a))*Math.cos(rad(c))*Math.sin(rad(d-b)/2)**2;return 6371000*2*Math.asin(Math.min(1,Math.sqrt(q)));}
@@ -43,6 +44,7 @@ export class Tracker {
      if(t.land.count>=2&&ts-t.land.at>=15000){f.landingAt=t.land.at;f.status='LANDED';f.estimatedLanding=true;t.flightId=null;t.groundAt=ts;t.land=null;}
     }else t.land=null;
    }
+   if(f){const evidence={vehicleType:a.vehicleType??f.vehicleType??t.last?.vehicleType,emitterCategory:a.emitterCategory||f.emitterCategory||t.last?.emitterCategory,aircraftType:a.aircraftType||f.aircraftType||t.last?.aircraftType,sources:f.sources};const kind=classify(evidence);Object.assign(f,evidence,{aircraftKind:kind.kind,kindReason:kind.reason});}
    t.lastReportAt=ts;t.last=a;t.trail.push([a.lat,a.lon,ts]);t.trail=t.trail.filter(p=>ts-p[2]<600000).slice(-80);
   }
   this.tick(now);this.updatedAt=now;
@@ -54,7 +56,8 @@ export function validateCorrection(p){
  if(p.landingAt!==null&&(!Number.isFinite(p.landingAt)||p.landingAt<p.takeoffAt))throw Error('Landing must be after take-off.');
  if(!['BRENTOR','PREDANNACK','VISITOR'].includes(p.origin))throw Error('Choose an origin.');
  if(typeof p.registration!=='string'||!p.registration.trim()||p.registration.length>30)throw Error('Enter a registration (up to 30 characters).');
- return {registration:p.registration.trim(),takeoffAt:p.takeoffAt,landingAt:p.landingAt,origin:p.origin,note:String(p.note||'').slice(0,300),manual:true,editedAt:Date.now()};
+ if(p.confirmedKind!==undefined&&p.confirmedKind!==null&&!['glider','other','unknown'].includes(p.confirmedKind))throw Error('Choose a valid aircraft classification.');
+ return {...(p.confirmedKind!==undefined?{confirmedKind:p.confirmedKind}:{}),registration:p.registration.trim(),takeoffAt:p.takeoffAt,landingAt:p.landingAt,origin:p.origin,note:String(p.note||'').slice(0,300),manual:true,editedAt:Date.now()};
 }
 export function corrected(f,p){return p?{...f,...p,status:p.landingAt?'LANDED':f.status}:f;}
 

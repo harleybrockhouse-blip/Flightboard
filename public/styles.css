@@ -10,3 +10,10 @@
 
 
 #sourceStatus{font-size:11px;max-width:170px;overflow-wrap:anywhere}.log-stats{flex-wrap:wrap}@media(max-width:760px){#sourceStatus{max-width:125px}}
+
+/* Aircraft classification remains visible through both colour and text. */
+.plane-body.kind-glider{color:#64d5ba}.plane-body.kind-probable{color:#efbf72}.plane-body.kind-other{color:#91b7f2}.plane-body.kind-unknown{color:#acb5c1}
+.plane-label small{display:block;font-size:9px;font-weight:500;white-space:nowrap}
+.flight-card.kind-glider{border-left:3px solid #64d5ba}.flight-card.kind-probable{border-left:3px solid #efbf72}.flight-card.kind-other{border-left:3px solid #91b7f2}.flight-card.kind-unknown{border-left:3px solid #acb5c1}
+.badge.kind-probable{color:var(--text);border:1px solid #c99839}.activity-heading{font-size:12px;font-weight:700;padding:10px 2px 4px}.traffic-legend{font-size:11px;line-height:1.5;margin:10px 0}
+[data-theme="light"] .plane-body.kind-glider{color:#006b52}[data-theme="light"] .plane-body.kind-probable{color:#8a5500}[data-theme="light"] .plane-body.kind-other{color:#245ca8}[data-theme="light"] .plane-body.kind-unknown{color:#555f70}

@@ -1,4 +1,4 @@
-# Brentor / Predannack Flightboard v0.7
+# Brentor / Predannack Flightboard v0.8
 
 A responsive aircraft monitoring and flight logging board for Brentor and Predannack, with an aircraft map, live activity, daily records and model weather.
 
@@ -131,3 +131,13 @@ A published Netlify production build runs the collector once per minute for both
 The scheduled collector also stores time-stamped aircraft position snapshots from ADS-B (Automatic Dependent Surveillance–Broadcast) and OGN (Open Glider Network), independently of browsers. Both airfields have separate hourly objects in their existing persistent Netlify store. Snapshots are sampled once per minute, with upstream source status retained. Each successful collection deletes expired position objects and trims the boundary hour to a rolling seven-day window. Flight summaries and corrections retain their existing longer retention. Feed outages cause gaps; one airfield failing does not prevent the other collector running.
 
 Flight log → Server tracks · 7 days downloads the available position archive as JSON. This preserves raw snapshots beyond server retention for subsequent reconstruction; this download is not the per-aircraft readsb import format and there is no built-in playback screen. GET /.netlify/functions/history?airfield=brentor lists available hours; append &hour=<epoch milliseconds> to retrieve one hour. Reads enforce seven-day expiry even if collection is interrupted. Collection begins at deployment, with no automatic historical backfill. No browser is required for collection or retention cleanup.
+
+## Automatic traffic and glider review
+
+The map refreshes OGN (Open Glider Network) and ADS-B (Automatic Dependent Surveillance–Broadcast) traffic every 15 seconds. The server independently collects both each minute for flight logs and seven-day position history. Live glider activity & passing traffic shows fresh targets immediately, even before two reports establish a flight record. Select this summary on existing devices; new devices use it by default.
+
+Classification retains OGN vehicle type, ADS-B emitter category and aircraft type. OGN type 1 and ADS-B category B1 are feed-reported glider/motor-glider evidence. Explicit other aircraft types (including tow planes) remain other traffic. Conflicting reports or an unknown OGN aircraft type are marked probable glider for review. An unknown ADS-B type stays unclassified: low altitude or slow speed alone never establishes a glider. Map marker colours, labels, live sections, filters, flight rows and CSV exports distinguish these categories. The glider launch total requires both glider classification and existing airfield departure evidence; probable candidates and passing aircraft are excluded from that total. Glider airborne/lost counts include probable candidates and are labelled accordingly. A glider first seen airborne remains departure-unconfirmed, even if overhead.
+
+Review a probable flight with Edit → Aircraft classification. Shared corrections require FLIGHTBOARD_EDIT_KEY on Netlify and the same key entered in Settings. Glider/other/unclassified review choices persist as authenticated correction overlays, survive source changes and are reflected in the daily totals. Choose Use feed classification to clear a manual review. Aircraft classification does not change origin, departure time or landing evidence. Existing archived records without aircraft metadata remain unclassified or probable according to their available evidence.
+
+Glide and Seek is an OGN tracking viewer, so its underlying network is already used rather than counted twice. Flightradar24 and UKAFG are reference links only: no credentials, paid API subscription or documented reusable UKAFG position feed have been supplied. The site does not imply these are connected sources or scrape their private interfaces. Source status identifies the providers actually queried.

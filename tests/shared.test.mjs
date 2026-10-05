@@ -26,3 +26,14 @@ test('server collection and reads work without an opt-in environment variable',a
   assert.deepEqual(await(await createRecordsHandler(()=>s)(new Request('https://board.test'))).json(),{enabled:false});
  }finally{if(previous===undefined)delete process.env.FLIGHTBOARD_SHARED;else process.env.FLIGHTBOARD_SHARED=previous;}
 });
+test('shared aircraft confirmation requires authentication and is recovered on later reads',async()=>{
+ process.env.FLIGHTBOARD_EDIT_KEY='test-secret';const s=memory();
+ await s.setJSON(`days/${day}`,[{...flight,vehicleType:'0',sources:['OGN']}]);
+ const handler=createRecordsHandler(()=>s,()=>true);
+ const body={id:flight.id,patch:{registration:flight.registration,origin:'VISITOR',takeoffAt:flight.takeoffAt,landingAt:null,note:'Aircraft type checked',confirmedKind:'glider'},expectedEditedAt:null};
+ assert.equal((await handler(request(body,'wrong'))).status,401);
+ assert.equal((await handler(request(body))).status,200);
+ const result=await(await handler(new Request(`https://board.test?day=${day}`))).json();
+ assert.equal(result.flights[0].confirmedKind,'glider');assert.equal(result.flights[0].aircraftKind,'glider');assert.equal(result.flights[0].origin,'VISITOR');
+ assert.equal(s.data.get(`days/${day}`)[0].confirmedKind,undefined);
+});

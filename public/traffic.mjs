@@ -1,11 +1,12 @@
 import {distance,Tracker,dayKey} from './tracker.mjs';
+import {enrichAircraft} from './classification.mjs';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 export function parseAdsb(data,receivedAt=Date.now()){
  const now=finite(data.now)?data.now*(data.now<1e12?1000:1):receivedAt;
  return (data.ac||data.aircraft||[]).flatMap(a=>{
   if(!/^[0-9a-f]{6}$/i.test(a.hex||'')||!finite(a.lat)||!finite(a.lon)||Math.abs(a.lat)>90||Math.abs(a.lon)>180||!finite(a.seen_pos)||a.seen_pos<0)return [];
   const ground=a.alt_baro==='ground',alt=finite(a.alt_geom)?a.alt_geom:finite(a.alt_baro)?a.alt_baro:null;
-  return [{deviceId:a.hex.toUpperCase(),icaoHex:a.hex.toLowerCase(),registration:a.r?.trim()||'',cn:a.flight?.trim()||'',lat:a.lat,lon:a.lon,altitudeM:alt===null?null:alt*.3048,speedKmh:finite(a.gs)?a.gs*1.852:null,trackDeg:finite(a.track)?a.track:null,climbMs:finite(a.geom_rate)?a.geom_rate*.00508:finite(a.baro_rate)?a.baro_rate*.00508:null,reportAt:Math.round(now-a.seen_pos*1000),onGround:ground,source:'ADSB',sources:['ADSB'],positionMethod:a.type||'unknown'}];
+  return [{deviceId:a.hex.toUpperCase(),icaoHex:a.hex.toLowerCase(),registration:a.r?.trim()||'',cn:a.flight?.trim()||'',lat:a.lat,lon:a.lon,altitudeM:alt===null?null:alt*.3048,speedKmh:finite(a.gs)?a.gs*1.852:null,trackDeg:finite(a.track)?a.track:null,climbMs:finite(a.geom_rate)?a.geom_rate*.00508:finite(a.baro_rate)?a.baro_rate*.00508:null,reportAt:Math.round(now-a.seen_pos*1000),onGround:ground,source:'ADSB',sources:['ADSB'],positionMethod:a.type||'unknown',emitterCategory:a.category||'',aircraftType:a.t||'',provider:'ADS-B.lol'}];
  });
 }
 const reg=a=>(a.registration||'').replace(/[^a-z0-9]/gi,'').toUpperCase();
@@ -13,7 +14,7 @@ export function mergeTraffic(ogn,adsb){
  const rows=ogn.map(a=>({...a,source:'OGN',sources:['OGN']}));
  for(const a of adsb){const existing=rows.find(b=>((reg(a)&&reg(a)===reg(b))||a.deviceId===b.deviceId.toUpperCase())&&distance(a.lat,a.lon,b.lat,b.lon)<3000);
   if(!existing){rows.push(a);continue;}const sources=[...new Set([...existing.sources,...a.sources])];if(a.reportAt>existing.reportAt){const id=existing.deviceId;Object.assign(existing,a,{deviceId:id,registration:existing.registration||a.registration});}existing.sources=sources;existing.icaoHex=a.icaoHex;
- }return rows;
+ }return rows.map(enrichAircraft);
 }
 export function parseTrace(data,cfg){
  if(!data||!finite(data.timestamp)||!Array.isArray(data.trace)||!data.trace.length||data.trace.length>100000||!/^[0-9a-f]{6}$/i.test(data.icao||''))throw Error('Choose a readsb / ADS-B.lol aircraft trace JSON file.');
