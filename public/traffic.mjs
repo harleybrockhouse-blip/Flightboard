@@ -4,9 +4,9 @@ const finite=v=>typeof v==='number'&&Number.isFinite(v);
 export function parseAdsb(data,receivedAt=Date.now()){
  const now=finite(data.now)?data.now*(data.now<1e12?1000:1):receivedAt;
  return (data.ac||data.aircraft||[]).flatMap(a=>{
-  if(!/^[0-9a-f]{6}$/i.test(a.hex||'')||!finite(a.lat)||!finite(a.lon)||Math.abs(a.lat)>90||Math.abs(a.lon)>180||!finite(a.seen_pos)||a.seen_pos<0)return [];
+  if(!/^~?[0-9a-f]{6}$/i.test(a.hex||'')||!finite(a.lat)||!finite(a.lon)||Math.abs(a.lat)>90||Math.abs(a.lon)>180||!finite(a.seen_pos)||a.seen_pos<0)return [];
   const ground=a.alt_baro==='ground',alt=finite(a.alt_geom)?a.alt_geom:finite(a.alt_baro)?a.alt_baro:null;
-  return [{deviceId:a.hex.toUpperCase(),icaoHex:a.hex.toLowerCase(),registration:a.r?.trim()||'',cn:a.flight?.trim()||'',lat:a.lat,lon:a.lon,altitudeM:alt===null?null:alt*.3048,speedKmh:finite(a.gs)?a.gs*1.852:null,trackDeg:finite(a.track)?a.track:null,climbMs:finite(a.geom_rate)?a.geom_rate*.00508:finite(a.baro_rate)?a.baro_rate*.00508:null,reportAt:Math.round(now-a.seen_pos*1000),onGround:ground,source:'ADSB',sources:['ADSB'],positionMethod:a.type||'unknown',emitterCategory:a.category||'',aircraftType:a.t||'',provider:'ADS-B.lol'}];
+  return [{deviceId:a.hex.startsWith('~')?'NONICAO_'+a.hex.slice(1).toUpperCase():a.hex.toUpperCase(),icaoHex:a.hex.startsWith('~')?null:a.hex.toLowerCase(),nonIcao:a.hex.startsWith('~'),registration:a.r?.trim()||'',cn:a.flight?.trim()||'',lat:a.lat,lon:a.lon,altitudeM:alt===null?null:alt*.3048,speedKmh:finite(a.gs)?a.gs*1.852:null,trackDeg:finite(a.track)?a.track:null,climbMs:finite(a.geom_rate)?a.geom_rate*.00508:finite(a.baro_rate)?a.baro_rate*.00508:null,reportAt:Math.round(now-a.seen_pos*1000),onGround:ground,source:'ADSB',sources:['ADSB'],positionMethod:a.type||'unknown',emitterCategory:a.category||'',aircraftType:a.t||'',provider:'ADS-B.lol'}];
  });
 }
 const reg=a=>(a.registration||'').replace(/[^a-z0-9]/gi,'').toUpperCase();

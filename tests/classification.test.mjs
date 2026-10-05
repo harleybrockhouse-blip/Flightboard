@@ -34,3 +34,12 @@ test('server tracking retains type evidence across source switches and never mak
  t.update([sample(now+20000,{source:'ADSB',sources:['ADSB']})],now+20000);
  assert.equal(classify(t.flights[0]).kind,'glider');
 });
+test('Flightradar screenshot fields PDANNACK and GLIM are separate; military glider type is recognised',()=>{
+ assert.equal(classify({cn:'PDANNACK',aircraftType:'GLIM',sources:['ADSB']}).kind,'glider');
+ assert.equal(classify({aircraftType:'Grob Viking T1'}).kind,'glider');
+ assert.equal(classify({cn:'PDANNACK',aircraftType:'C172',emitterCategory:'A1'}).kind,'other');
+});
+test('non-ICAO positioned targets are retained without colliding with ICAO identities',()=>{
+ const rows=parseAdsb({now:Date.now()/1000,ac:[{hex:'~abcdef',flight:'PDANNACK',t:'GLIM',lat:50,lon:-5,seen_pos:0,alt_baro:300,gs:51},{hex:'abcdef',lat:50,lon:-5,seen_pos:0}]});
+ assert.equal(rows.length,2);assert.equal(rows[0].deviceId,'NONICAO_ABCDEF');assert.equal(rows[0].icaoHex,null);assert.notEqual(rows[0].deviceId,rows[1].deviceId);assert.equal(classify(rows[0]).kind,'glider');
+});

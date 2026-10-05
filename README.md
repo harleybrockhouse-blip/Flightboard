@@ -149,3 +149,11 @@ The logbook defaults to Gliders only with All departures, so gliders first seen 
 OGN device-registry enrichment uses public registration lookups, honours TRACKED and IDENTIFIED flags, caches responses, and retains model/type evidence in new server records. G-DDNE and G-DDSL have verified public registry seed entries from 5 October 2026, so old Brentor records can be identified immediately when upstream lookup fails. PDANNACK GLIM is recognised as a glider identity supplied by the user; this does not manufacture flights or establish a Predannack departure. Manual review takes precedence over registry classification.
 
 Recording began during the afternoon of 4 October 2026. The Saturday 3 October Predannack server archive is empty. Historical OGN FlightBook and LogBook airfield-name lookups did not return these airfields; no historical flights are invented or backfilled by this release. Earlier flight recovery requires accessible historical telemetry or an actual launch log.
+
+## Coverage correction v0.9.1
+
+The supplied Flightradar24 screenshot has callsign PDANNACK and aircraft-type code GLIM (shown as Grob Viking T1), not a single callsign PDANNACK GLIM. GLIM/GLID and the explicit Grob Viking T1 model are now glider-type evidence, with conflicting type reports still flagged for review. Callsign PDANNACK alone is not sufficient to manufacture an aircraft identity or a flight record.
+
+The ADS-B parser now retains positioned targets whose readsb address begins with ~ (non-ICAO addresses). These use a separate NONICAO_ identity namespace to avoid collisions with ordinary aircraft addresses; they are not labelled as ICAO hex identities. Freshness and position validation still apply. Such targets were previously discarded by the six-hex-only check. This is a verified parser defect, not evidence that the supplied screenshot's aircraft had such an address.
+
+No PDANNACK/GLIM/Viking match was found in the available Predannack server flight records. The screenshot confirms aircraft type but contains no aircraft registration, unique address, absolute date/time or downloadable telemetry. It cannot reconstruct earlier flight times. Flightradar24 coverage is separate from the connected OGN and ADS-B.lol feeds. A tested Airplanes.live public request returned HTTP 403, so that provider has not been added or advertised as connected.
