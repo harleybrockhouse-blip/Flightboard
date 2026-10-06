@@ -24,20 +24,11 @@ test('manual review persists and can be cleared, without changing departure orig
  assert.equal(classify(corrected(reviewed,validateCorrection({...f,confirmedKind:null}))).kind,'probable');
  assert.throws(()=>validateCorrection({...f,confirmedKind:'airliner'}));
 });
-test('server tracking retains type evidence across source switches and never makes an overhead glider an airfield launch',()=>{
- const now=Date.now(),a=AIRFIELDS.brentor,t=new Tracker({},a);
- const sample=(ts,extra)=>({deviceId:'A',registration:'G-TEST',lat:a.lat,lon:a.lon,speedKmh:90,altitudeM:500,reportAt:ts,...extra});
- t.update([sample(now-20000,{source:'OGN',sources:['OGN'],vehicleType:'1'})],now-20000);
- t.update([sample(now,{source:'ADSB',sources:['ADSB'],emitterCategory:'B1'})],now);
- assert.equal(t.flights.length,1);assert.equal(t.flights[0].aircraftKind,'glider');assert.equal(t.flights[0].vehicleType,'1');
- assert.equal(t.flights[0].origin,'VISITOR');
- t.update([sample(now+20000,{source:'ADSB',sources:['ADSB']})],now+20000);
- assert.equal(classify(t.flights[0]).kind,'glider');
-});
+test('overhead gliders are live traffic, not local flight records',()=>{const now=Date.now(),a=AIRFIELDS.brentor,t=new Tracker({},a);for(const offset of [-20000,0])t.update([{deviceId:'A',registration:'G-TEST',lat:a.lat,lon:a.lon,speedKmh:90,altitudeM:500,vehicleType:'1',reportAt:now+offset}],now+offset);assert.equal(t.flights.length,0)});
 test('Flightradar screenshot fields PDANNACK and GLIM are separate; military glider type is recognised',()=>{
  assert.equal(classify({cn:'PDANNACK',aircraftType:'GLIM',sources:['ADSB']}).kind,'glider');
  assert.equal(classify({aircraftType:'Grob Viking T1'}).kind,'glider');
- assert.equal(classify({cn:'PDANNACK',aircraftType:'C172',emitterCategory:'A1'}).kind,'other');
+ assert.equal(classify({cn:'PDANNACK',aircraftType:'G103'}).kind,'glider');assert.equal(classify({cn:'PDANNACK',confirmedKind:'other'}).kind,'other');
 });
 test('non-ICAO positioned targets are retained without colliding with ICAO identities',()=>{
  const rows=parseAdsb({now:Date.now()/1000,ac:[{hex:'~abcdef',flight:'PDANNACK',t:'GLIM',lat:50,lon:-5,seen_pos:0,alt_baro:300,gs:51},{hex:'abcdef',lat:50,lon:-5,seen_pos:0}]});

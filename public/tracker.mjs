@@ -1,10 +1,10 @@
-import {classify} from './classification.mjs';
-export const DEFAULTS = {lat:50.592183,lon:-4.151667,elevationM:250,radiusM:850,takeoffSpeedKmh:38,takeoffHeightM:30,landingSpeedKmh:25,landingHeightM:35,freshMs:90000,lostMs:120000,polygon:[]};
+import {classify,isPredannack} from './classification.mjs';
+export const DEFAULTS = {lat:50.592183,lon:-4.151667,elevationM:250,radiusM:850,takeoffSpeedKmh:38,takeoffHeightM:30,landingSpeedKmh:25,landingHeightM:35,freshMs:90000,lostMs:120000,polygon:[],maxLaunchHeightM:350,maxLaunchSpeedKmh:180,groundMemoryMs:180000};
 export const dayKey=(ts=Date.now())=>new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/London',year:'numeric',month:'2-digit',day:'2-digit'}).format(ts);
 export function distance(a,b,c,d){const rad=x=>x*Math.PI/180;const q=Math.sin(rad(c-a)/2)**2+Math.cos(rad(a))*Math.cos(rad(c))*Math.sin(rad(d-b)/2)**2;return 6371000*2*Math.asin(Math.min(1,Math.sqrt(q)));}
 export function inside(a,cfg=DEFAULTS){const p=cfg.polygon;if(!p?.length)return distance(cfg.lat,cfg.lon,a.lat,a.lon)<=cfg.radiusM;let yes=false;for(let i=0,j=p.length-1;i<p.length;j=i++){const [yi,xi]=p[i],[yj,xj]=p[j];if((yi>a.lat)!==(yj>a.lat)&&a.lon<(xj-xi)*(a.lat-yi)/(yj-yi)+xi)yes=!yes;}return yes;}
 export const nameOf=a=>(a.registration&&a.registration.toLowerCase()!=='hidden'?a.registration:a.cn||a.deviceId||'Unknown');
-export function flightDuration(f,now=Date.now()){return Math.max(0,(f.landingAt??((f.status==='LOST'||f.status==='UNKNOWN')?f.lastReportAt:Math.min(now,(f.lastReportAt||now)+DEFAULTS.lostMs)))-f.takeoffAt);}
+export function flightDuration(f,now=Date.now()){return Math.max(0,(f.landingAt??((f.status==='LOST'||f.status==='UNKNOWN')?f.lastReportAt:(f.lastReportAt||f.takeoffAt)))-f.takeoffAt);}
 export class Tracker {
  constructor(saved={},config={}){this.cfg={...DEFAULTS,...config};this.tracks=saved.tracks||{};this.flights=saved.flights||[];this.updatedAt=saved.updatedAt||0;}
  reconcile(patches){for(const f of this.flights){const p=patches[f.id];if(!p)continue;const t=this.tracks[f.deviceId];if(p.landingAt){f.closedByCorrection=true;if(t?.flightId===f.id){t.flightId=null;t.launch=null;t.land=null;t.groundAt=0;}}else if(f.closedByCorrection){delete f.closedByCorrection;if(t&&!t.flightId)t.flightId=f.id;}}}
@@ -20,31 +20,34 @@ export class Tracker {
    if(!t)t=this.tracks[id]={id,lastReportAt:0,groundAt:0,launch:null,land:null,flightId:null,trail:[]};
    if(ts<=t.lastReportAt+3000)continue;
    const gap=ts-t.lastReportAt;
+   if(gap>21600000)t.groundAltitudeM=null;
    if(gap>c.lostMs){t.launch=null;t.land=null;t.groundAt=0;}
-   const h=a.onGround===true?0:Number.isFinite(a.altitudeM)?a.altitudeM-c.elevationM:null;
+   const altitudeBasis=a.altitudeReference||a.source||'OGN';
+   if(t.altitudeBasis!==altitudeBasis){t.groundAltitudeM=null;t.altitudeBasis=altitudeBasis;}
+   const h=a.onGround===true?0:Number.isFinite(a.altitudeM)?a.altitudeM-(Number.isFinite(t.groundAltitudeM)?t.groundAltitudeM:c.elevationM):null;
    const speed=a.speedKmh;
-   const ground=inside(a,c)&&Number.isFinite(speed)&&speed<=c.landingSpeedKmh&&h!==null&&h<=c.landingHeightM;
-   const flying=Number.isFinite(speed)&&h!==null&&speed>=c.takeoffSpeedKmh&&h>=c.takeoffHeightM;
+   const ground=inside(a,c)&&Number.isFinite(speed)&&speed<=c.landingSpeedKmh&&(a.onGround===true||(h!==null&&h>=-50&&h<=c.landingHeightM&&a.altitudeReference!=='ellipsoid'));
+   const flying=Number.isFinite(speed)&&h!==null&&a.onGround!==true&&(a.altitudeReference!=='ellipsoid'||Number.isFinite(t.groundAltitudeM))&&speed>=c.takeoffSpeedKmh&&speed<=c.maxLaunchSpeedKmh&&h>=c.takeoffHeightM;
    let f=this.flights.find(x=>x.id===t.flightId&&!x.landingAt&&!x.closedByCorrection&&!x.closedUnresolved);
-   if(f&&gap>21600000){f.status='LOST';f.closedUnresolved=true;t.flightId=null;f=null;}
+   if(f&&gap>c.lostMs){f.status='LOST';f.closedUnresolved=true;t.flightId=null;f=null;}
    if(!f){
-    if(ground){t.groundAt=ts;t.launch=null;}
-    else if(flying){
-     if(!t.launch)t.launch={at:ts,count:0,origin:t.groundAt&&ts-t.groundAt<180000?(c.origin||'BRENTOR'):'VISITOR'};
+    if(ground){t.groundAt=ts;t.launch=null;if(Number.isFinite(a.altitudeM))t.groundAltitudeM=a.altitudeM;}
+    else if((c.origin!=='PREDANNACK'||isPredannack(a))&&((flying&&((t.launch&&ts-t.launch.at<=c.lostMs&&distance(c.lat,c.lon,a.lat,a.lon)<5000)||(t.groundAt&&ts-t.groundAt<c.groundMemoryMs&&inside(a,c)&&h<=c.maxLaunchHeightM)))||(c.origin==='PREDANNACK'&&isPredannack(a)&&!t.groundAt&&a.onGround!==true&&a.altitudeReference!=='ellipsoid'&&Number.isFinite(speed)&&speed>=c.takeoffSpeedKmh&&speed<=c.maxLaunchSpeedKmh&&h!==null&&h>=-50&&h<=c.maxLaunchHeightM&&inside(a,c)))){
+     if(!t.launch)t.launch={at:ts,count:0,origin:c.origin||'BRENTOR',groundAt:t.groundAt||null};
      t.launch.count++;
      if(t.launch.count>=2){
-      f={id:`${id}-${t.launch.at}`,deviceId:id,registration:nameOf(a),cn:a.cn||'',takeoffAt:t.launch.at,landingAt:null,lastReportAt:ts,maxAltM:a.altitudeM,referenceElevationM:c.elevationM,origin:t.launch.origin,status:'AIRBORNE',estimatedTakeoff:true,estimatedLanding:false,source:a.source||'OGN',sources:a.sources||['OGN']};
+      f={id:`${id}-${t.launch.at}`,deviceId:id,registration:nameOf(a),cn:a.cn||'',takeoffAt:t.launch.at,landingAt:null,lastReportAt:ts,maxAltM:a.altitudeM,maxRelativeHeightM:Math.max(0,h),referenceElevationM:c.elevationM,origin:t.launch.origin,status:'AIRBORNE',estimatedTakeoff:true,departureConfirmed:!!t.launch.groundAt,takeoffWindow:t.launch.groundAt?[t.launch.groundAt,t.launch.at]:null,partial:!t.launch.groundAt,detectionVersion:10,altitudeReference:a.altitudeReference||'feed',heightBaselineM:t.groundAltitudeM??c.elevationM,estimatedLanding:false,source:a.source||'OGN',sources:a.sources||['OGN']};
       this.flights.push(f);t.flightId=f.id;t.launch=null;t.groundAt=0;
      }
     }else t.launch=null;
    }else{
-    f.lastReportAt=ts;f.sources=[...new Set([...(f.sources||['OGN']),...(a.sources||['OGN'])])];f.status='AIRBORNE';f.maxAltM=Math.max(f.maxAltM??a.altitudeM??0,a.altitudeM??0);
+    f.lastReportAt=ts;if(Number.isFinite(h))f.maxRelativeHeightM=Math.max(f.maxRelativeHeightM||0,h);f.sources=[...new Set([...(f.sources||['OGN']),...(a.sources||['OGN'])])];f.status='AIRBORNE';f.maxAltM=Math.max(f.maxAltM??a.altitudeM??0,a.altitudeM??0);
     if(ground){
-     if(!t.land)t.land={at:ts,count:0};t.land.count++;
-     if(t.land.count>=2&&ts-t.land.at>=15000){f.landingAt=t.land.at;f.status='LANDED';f.estimatedLanding=true;t.flightId=null;t.groundAt=ts;t.land=null;}
+     if(!t.land)t.land={at:ts,count:0,previousAt:t.lastReportAt};t.land.count++;
+     if(t.land.count>=2&&ts-t.land.at>=15000){f.landingAt=t.land.at;f.landingWindow=[t.land.previousAt,t.land.at];f.status='LANDED';f.estimatedLanding=true;t.flightId=null;t.groundAt=ts;t.land=null;}
     }else t.land=null;
    }
-   if(f){const evidence={registryType:a.registryType||f.registryType||t.last?.registryType,identitySource:a.identitySource||f.identitySource,vehicleType:a.vehicleType??f.vehicleType??t.last?.vehicleType,emitterCategory:a.emitterCategory||f.emitterCategory||t.last?.emitterCategory,aircraftType:a.aircraftType||f.aircraftType||t.last?.aircraftType,sources:f.sources};const kind=classify(evidence);Object.assign(f,evidence,{aircraftKind:kind.kind,kindReason:kind.reason});}
+   if(f){if(c.origin==='PREDANNACK'&&isPredannack(a))a.aircraftType=a.aircraftType||'G103';const evidence={registryType:a.registryType||f.registryType||t.last?.registryType,identitySource:a.identitySource||f.identitySource,vehicleType:a.vehicleType??f.vehicleType??t.last?.vehicleType,emitterCategory:a.emitterCategory||f.emitterCategory||t.last?.emitterCategory,aircraftType:a.aircraftType||f.aircraftType||t.last?.aircraftType,cn:a.cn||f.cn,sources:f.sources};const kind=classify(evidence);Object.assign(f,evidence,{aircraftKind:kind.kind,kindReason:kind.reason});}
    t.lastReportAt=ts;t.last=a;t.trail.push([a.lat,a.lon,ts]);t.trail=t.trail.filter(p=>ts-p[2]<600000).slice(-80);
   }
   this.tick(now);this.updatedAt=now;

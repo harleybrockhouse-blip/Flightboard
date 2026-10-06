@@ -3,7 +3,7 @@ import {createRecordsHandler} from '../netlify/functions/records.mjs';
 import {createCollector} from '../netlify/functions/collect.mjs';
 import {dayKey} from '../public/tracker.mjs';
 const now=Date.now(),day=dayKey(now),flight={id:'ABC-123',deviceId:'ABC',registration:'G-TEST',origin:'BRENTOR',takeoffAt:now-3600000,landingAt:null,lastReportAt:now,status:'AIRBORNE'};
-function memory(){const data=new Map(),tags=new Map();let seq=0;return{async list(){return {blobs:[...data.keys()].filter(key=>key.startsWith('positions/')).map(key=>({key}))}},async delete(k){data.delete(k)},async get(k){return structuredClone(data.get(k)||null)},async getWithMetadata(k){return data.has(k)?{data:structuredClone(data.get(k)),etag:tags.get(k)}:null},async setJSON(k,v,o={}){if((o.onlyIfNew&&data.has(k))||(o.onlyIfMatch&&o.onlyIfMatch!==tags.get(k)))return {modified:false};data.set(k,structuredClone(v));const etag=String(++seq);tags.set(k,etag);return {modified:true,etag}},data};}
+function memory(){const data=new Map(),tags=new Map();let seq=0;return{async list({prefix='positions/'}={}){return {blobs:[...data.keys()].filter(key=>key.startsWith(prefix)).map(key=>({key}))}},async delete(k){data.delete(k)},async get(k){return structuredClone(data.get(k)||null)},async getWithMetadata(k){return data.has(k)?{data:structuredClone(data.get(k)),etag:tags.get(k)}:null},async setJSON(k,v,o={}){if((o.onlyIfNew&&data.has(k))||(o.onlyIfMatch&&o.onlyIfMatch!==tags.get(k)))return {modified:false};data.set(k,structuredClone(v));const etag=String(++seq);tags.set(k,etag);return {modified:true,etag}},data};}
 const request=(body,key='test-secret')=>new Request(`https://board.test/.netlify/functions/records?day=${day}`,{method:'POST',headers:{authorization:`Bearer ${key}`},body:JSON.stringify(body)});
 test('shared records disabled returns local-mode indicator',async()=>{const handler=createRecordsHandler(()=>null,()=>false);assert.deepEqual(await(await handler(new Request('https://board.test'))).json(),{enabled:false})});
 test('shared read merges corrections without changing original detection',async()=>{const s=memory();await s.setJSON(`days/${day}`,[flight]);await s.setJSON('corrections/ABC-123',{registration:'G-FIXED',landingAt:now-1000});const handler=createRecordsHandler(()=>s,()=>true);const result=await(await handler(new Request(`https://board.test?day=${day}`))).json();assert.equal(result.flights[0].registration,'G-FIXED');assert.equal(s.data.get(`days/${day}`)[0].registration,'G-TEST')});
@@ -34,14 +34,16 @@ test('shared aircraft confirmation requires authentication and is recovered on l
  assert.equal((await handler(request(body,'wrong'))).status,401);
  assert.equal((await handler(request(body))).status,200);
  const result=await(await handler(new Request(`https://board.test?day=${day}`))).json();
- assert.equal(result.flights[0].confirmedKind,'glider');assert.equal(result.flights[0].aircraftKind,'glider');assert.equal(result.flights[0].origin,'VISITOR');
+ assert.equal(result.flights.length,0);assert.equal(s.data.get('corrections/'+flight.id).confirmedKind,'glider');
  assert.equal(s.data.get(`days/${day}`)[0].confirmedKind,undefined);
 });
-test('seven-day logbook loads each date, retains visitor gliders, and rejects invalid ranges',async()=>{
+test('logbook excludes visitor aircraft and validates annual ranges',async()=>{
  const s=memory(),end='2026-10-05';await s.setJSON('days/2026-10-04',[{...flight,id:'sunday',registration:'G-DDSL',sources:['OGN'],origin:'VISITOR',takeoffAt:Date.parse('2026-10-04T14:00:00Z')}]);
  const handler=createRecordsHandler(()=>s,()=>true);
  const result=await(await handler(new Request(`https://board.test?day=${end}&days=7`))).json();
- assert.equal(result.days.length,7);assert.equal(result.flights.length,1);assert.equal(result.flights[0].aircraftKind,'glider');assert.equal(result.flights[0].origin,'VISITOR');
+ assert.equal(result.days.length,7);assert.equal(result.flights.length,0);
  assert.equal((await handler(new Request('https://board.test?day=2026-02-30'))).status,400);
- assert.equal((await handler(new Request('https://board.test?days=8'))).status,400);
+ assert.equal((await handler(new Request('https://board.test?days=367'))).status,400);
 });
+test('year range reads only available archives and excludes transiting records',async()=>{const s=memory();await s.setJSON('days/2026-01-02',[{...flight,takeoffAt:Date.parse('2026-01-02T10:00:00Z')}]);await s.setJSON('days/2026-10-05',[{...flight,id:'transit',origin:'VISITOR',takeoffAt:Date.parse('2026-10-05T10:00:00Z')}]);const result=await(await createRecordsHandler(()=>s,()=>true)(new Request('https://board.test?day=2026-10-06&days=279'))).json();assert.equal(result.days.length,279);assert.equal(result.flights.length,1);assert.equal(result.flights[0].origin,'BRENTOR')});
+test('historic PDANNACK callsigns recover as partial club activity without inventing departure',async()=>{const s=memory();await s.setJSON('days/2026-10-03',[{...flight,cn:'PDANNACK',registration:'43BC89',origin:'VISITOR',takeoffAt:Date.parse('2026-10-03T10:00:00Z')}]);const result=await(await createRecordsHandler(()=>s,()=>true)(new Request('https://board.test?airfield=predannack&day=2026-10-03'))).json();assert.equal(result.flights.length,1);assert.equal(result.flights[0].aircraftType,'G103');assert.equal(result.flights[0].partial,true);assert.equal(result.flights[0].departureConfirmed,false);assert.equal(s.data.get('days/2026-10-03')[0].origin,'VISITOR')});

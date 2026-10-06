@@ -1,14 +1,15 @@
+export const isPredannack=a=>/^PDANNACK(?:\b|[0-9]|GLIM)/.test(String(a.cn||a.callsign||a.registration||'').trim().toUpperCase());
 export const KINDS=['glider','probable','other','unknown'];
 export function classify(a={}){
  if(['glider','other','unknown'].includes(a.confirmedKind))return {kind:a.confirmedKind,reason:'Manually reviewed',reviewed:true};
  const labels=[a.registration,a.cn,a.deviceId,a.name,[a.registration,a.cn].filter(Boolean).join(' ')].map(s=>String(s||'').replace(/[^a-z0-9]/gi,'').toUpperCase());
- if(labels.includes('PDANNACKGLIM'))return {kind:'glider',reason:'User-confirmed Predannack glider identity: PDANNACK GLIM'};
+ if(isPredannack(a)||labels.includes('PDANNACKGLIM'))return {kind:'glider',reason:'User-confirmed Predannack club glider callsign'};
  const registry=String(a.registryType||'');
  if(registry==='1')return {kind:'glider',reason:'OGN device registry identifies glider / motor glider'};
  if(/^[2-6]$/.test(registry))return {kind:'other',reason:'OGN device registry identifies another aircraft type'};
  const v=String(a.vehicleType??''),category=String(a.emitterCategory||'').toUpperCase();
  const model=String(a.aircraftType||'').trim().toUpperCase();
- const modelGlider=['GLIM','GLID'].includes(model)||/^GROB\s+VIKING\s+T1$/.test(model);
+ const modelGlider=['GLIM','GLID','G103'].includes(model)||/^GROB\s+VIKING\s+T1$/.test(model);
  const glider=v==='1'||category==='B1'||modelGlider;
  const other=(/^(2|3|4|5|6|7|8|9|10|11|12|13|15)$/.test(v))||/^A[1-7]$|^B[2-7]$|^C[1-7]$/.test(category);
  if(glider&&other)return {kind:'probable',reason:'Conflicting aircraft-type reports · confirm'};
@@ -20,6 +21,6 @@ export function classify(a={}){
  if((a.sources||[]).includes('OGN')||a.source==='OGN')return {kind:'probable',reason:'OGN target without a known aircraft type · confirm'};
  return {kind:'unknown',reason:'No aircraft-type evidence'};
 }
-export const enrichAircraft=a=>{const c=classify(a);return {...a,aircraftKind:c.kind,kindReason:c.reason};};
+export const enrichAircraft=a=>{if(isPredannack(a)&&!a.aircraftType)a={...a,aircraftType:'G103'};const c=classify(a);return {...a,aircraftKind:c.kind,kindReason:c.reason};};
 export const kindLabel=a=>({glider:classify(a).reviewed?'Glider · confirmed':'Glider · feed reported',probable:'Probable glider · confirm',other:classify(a).reviewed?'Other aircraft · confirmed':'Other aircraft',unknown:'Unclassified aircraft'})[classify(a).kind];
 export const gliderLike=a=>['glider','probable'].includes(classify(a).kind);
