@@ -5,6 +5,7 @@ import {enabled,store} from '../../lib/store.mjs';
 import {Tracker,dayKey,validateCorrection,corrected} from '../../public/tracker.mjs';
 import {localRecord} from '../../public/logbook.mjs';
 import {isPredannack,classify} from '../../public/classification.mjs';
+import {PREDANNACK_HISTORIC_FLIGHTS} from '../../public/predannack-data.mjs';
 import {timingSafeEqual} from 'node:crypto';
 const reply=(data,status=200)=>Response.json(data,{status,headers:{'cache-control':'no-store'}});
 export const createRecordsHandler=(getStore=store,isEnabled=enabled)=>async(req)=>{
@@ -13,7 +14,7 @@ export const createRecordsHandler=(getStore=store,isEnabled=enabled)=>async(req)
  const u=new URL(req.url),airfield=resolveAirfield(u.searchParams.get('airfield'));if(!airfield)return reply({error:'Unknown airfield'},400);const s=getStore(airfield.id),day=u.searchParams.get('day')||dayKey();const count=Number(u.searchParams.get('days')||1);if(!Number.isInteger(count)||count<1||count>366)return reply({error:'Choose between one and 366 days'},400);
  if(!/^\d{4}-\d{2}-\d{2}$/.test(day)||!Number.isFinite(Date.parse(day+'T12:00:00Z'))||new Date(day+'T12:00:00Z').toISOString().slice(0,10)!==day)return reply({error:'Invalid date'},400);
  if(req.method==='GET'){
-  const dates=Array.from({length:count},(_,i)=>new Date(Date.parse(day+'T12:00:00Z')-i*86400000).toISOString().slice(0,10));if(count<=7)await repairActivity(s,airfield,dates);const keys=count>7?(await s.list({prefix:'days/'})).blobs.map(b=>b.key).filter(k=>dates.includes(k.slice(5))):dates.map(date=>`days/${date}`);const archives=[];for(let i=0;i<keys.length;i+=12)archives.push(...await Promise.all(keys.slice(i,i+12).map(k=>s.get(k,{type:'json'}))));const snapshot=await s.get('tracker',{type:'json'});const flights=archives.flatMap(a=>a||[]);
+  const dates=Array.from({length:count},(_,i)=>new Date(Date.parse(day+'T12:00:00Z')-i*86400000).toISOString().slice(0,10));if(count<=7)await repairActivity(s,airfield,dates);const keys=count>7?(await s.list({prefix:'days/'})).blobs.map(b=>b.key).filter(k=>dates.includes(k.slice(5))):dates.map(date=>`days/${date}`);const archives=[];for(let i=0;i<keys.length;i+=12)archives.push(...await Promise.all(keys.slice(i,i+12).map(k=>s.get(k,{type:'json'}))));const snapshot=await s.get('tracker',{type:'json'});const embedded=airfield.id==='predannack'?PREDANNACK_HISTORIC_FLIGHTS.filter(f=>dates.includes(dayKey(f.takeoffAt))):[];const flights=[...archives.flatMap(a=>a||[]),...embedded];
   const fs=await Promise.all((flights||[]).map(async f=>{
    const last=snapshot?.tracks?.[f.deviceId]?.last;const evidence={...f,vehicleType:f.vehicleType??last?.vehicleType,emitterCategory:f.emitterCategory||last?.emitterCategory,aircraftType:f.aircraftType||last?.aircraftType};
    if(airfield.id==='predannack'&&isPredannack(evidence)){evidence.aircraftType=evidence.aircraftType||'G103';if(evidence.origin==='VISITOR'){evidence.origin='PREDANNACK';evidence.partial=true;evidence.departureConfirmed=false;}}
@@ -41,4 +42,3 @@ export const createRecordsHandler=(getStore=store,isEnabled=enabled)=>async(req)
 };
 
 export default createRecordsHandler();
-

@@ -1,6 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {filterLog,dailyTotals,logDays} from '../public/logbook.mjs';
+import {filterLog,dailyTotals,logDays,completedAirTime,launchCount,localRecord} from '../public/logbook.mjs';
 import {classify} from '../public/classification.mjs';
+import {PREDANNACK_HISTORIC_FLIGHTS} from '../public/predannack-data.mjs';
 import {applyIdentity} from '../lib/identity.mjs';
 const at=Date.parse('2026-10-04T14:00:00Z');
 const rows=[{registration:'G-DDSL',deviceId:'D01496',sources:['OGN'],registryType:'1',origin:'VISITOR',takeoffAt:at,landingAt:at+300000},{registration:'OTHER',vehicleType:'2',origin:'BRENTOR',takeoffAt:at,landingAt:at+100000},{registration:'MAYBE',sources:['OGN'],origin:'BRENTOR',takeoffAt:at,landingAt:null,status:'LOST'}];
@@ -14,6 +15,12 @@ test('daily totals keep activity distinct from confirmed airfield departures and
 });
 test('PDANNACK GLIM uses the user-confirmed identity without guessing a departure',()=>{
  const c=classify({cn:'PDANNACK GLIM',origin:'VISITOR'});assert.equal(c.kind,'glider');assert.match(c.reason,/User-confirmed/);
+});
+test('supplied 43BC85 track contributes six permanent Predannack flights and totals',()=>{
+ assert.equal(PREDANNACK_HISTORIC_FLIGHTS.length,6);
+ assert.equal(PREDANNACK_HISTORIC_FLIGHTS.every(f=>localRecord(f,'PREDANNACK')&&classify(f).kind==='glider'),true);
+ assert.equal(launchCount(PREDANNACK_HISTORIC_FLIGHTS,'PREDANNACK'),6);
+ assert.equal(completedAirTime(PREDANNACK_HISTORIC_FLIGHTS),2028600);
 });
 test('registry respects opt-outs and manual review, and rejects ambiguous aircraft types',()=>{
  const a={registration:'G-TEST',deviceId:'A',sources:['OGN']},d={registration:'G-TEST',device_id:'A',aircraft_type:1,tracked:'Y',identified:'Y',aircraft_model:'Twin Astir'};

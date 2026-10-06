@@ -1,6 +1,8 @@
-export const isPredannack=a=>/^PDANNACK(?:\b|[0-9]|GLIM)/.test(String(a.cn||a.callsign||a.registration||'').trim().toUpperCase());
+import {predannackFleetAircraft} from './predannack-data.mjs';
+export const isPredannack=a=>!!predannackFleetAircraft(a)||/^PDANNACK(?:\b|[0-9]|GLIM)/.test(String(a.cn||a.callsign||a.registration||'').trim().toUpperCase());
 export const KINDS=['glider','probable','other','unknown'];
 export function classify(a={}){
+ const fleet=predannackFleetAircraft(a);if(fleet)return {kind:'glider',reason:'Permanent Predannack fleet aircraft · 626 VGS'};
  if(['glider','other','unknown'].includes(a.confirmedKind))return {kind:a.confirmedKind,reason:'Manually reviewed',reviewed:true};
  const labels=[a.registration,a.cn,a.deviceId,a.name,[a.registration,a.cn].filter(Boolean).join(' ')].map(s=>String(s||'').replace(/[^a-z0-9]/gi,'').toUpperCase());
  if(isPredannack(a)||labels.includes('PDANNACKGLIM'))return {kind:'glider',reason:'User-confirmed Predannack club glider callsign'};
@@ -21,6 +23,6 @@ export function classify(a={}){
  if((a.sources||[]).includes('OGN')||a.source==='OGN')return {kind:'probable',reason:'OGN target without a known aircraft type · confirm'};
  return {kind:'unknown',reason:'No aircraft-type evidence'};
 }
-export const enrichAircraft=a=>{if(isPredannack(a)&&!a.aircraftType)a={...a,aircraftType:'G103'};const c=classify(a);return {...a,aircraftKind:c.kind,kindReason:c.reason};};
+export const enrichAircraft=a=>{const fleet=predannackFleetAircraft(a);if(fleet)a={...a,registration:a.registration||fleet.deviceId,cn:a.cn||fleet.callsign,aircraftType:a.aircraftType||fleet.aircraftType,operator:a.operator||fleet.operator};else if(isPredannack(a)&&!a.aircraftType)a={...a,aircraftType:'G103'};const c=classify(a);return {...a,aircraftKind:c.kind,kindReason:c.reason};};
 export const kindLabel=a=>({glider:classify(a).reviewed?'Glider · confirmed':'Glider · feed reported',probable:'Probable glider · confirm',other:classify(a).reviewed?'Other aircraft · confirmed':'Other aircraft',unknown:'Unclassified aircraft'})[classify(a).kind];
 export const gliderLike=a=>['glider','probable'].includes(classify(a).kind);

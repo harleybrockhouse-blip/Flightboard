@@ -8,3 +8,5 @@ v0.10.0: 56 automated tests passed, including pressure/geometric altitude separa
 
 
 v0.11.0: 41 targeted/regression checks passed in JavaScript runtime, covering retained nearby gliders, unknown altitude, probable landing/reopening, calendar periods, historical replay and persistence. Both-airfield UI smoke checks also passed: the default seven-day view showed activity and probable landing labels. Changed JavaScript syntax parsed successfully. Shell workspace was unavailable, so the full npm test/build and visual browser tests were not run in this session.
+
+v0.12.0: 62 automated checks passed, including permanent 43BC85 fleet recognition without a callsign, six embedded Predannack historical flights, six-launch counting, and 2,028,600 milliseconds of completed recorded time. The Netlify source/function syntax build and whitespace checks also passed.
