@@ -24,7 +24,7 @@ test('manual review persists and can be cleared, without changing departure orig
  assert.equal(classify(corrected(reviewed,validateCorrection({...f,confirmedKind:null}))).kind,'probable');
  assert.throws(()=>validateCorrection({...f,confirmedKind:'airliner'}));
 });
-test('overhead gliders are live traffic, not local flight records',()=>{const now=Date.now(),a=AIRFIELDS.brentor,t=new Tracker({},a);for(const offset of [-20000,0])t.update([{deviceId:'A',registration:'G-TEST',lat:a.lat,lon:a.lon,speedKmh:90,altitudeM:500,vehicleType:'1',reportAt:now+offset}],now+offset);assert.equal(t.flights.length,0)});
+test('nearby overhead gliders produce partial activity, not launch counts',()=>{const now=Date.now(),a=AIRFIELDS.brentor,t=new Tracker({},a);for(const offset of [-20000,0])t.update([{deviceId:'A',registration:'G-TEST',lat:a.lat,lon:a.lon,speedKmh:90,altitudeM:500,vehicleType:'1',reportAt:now+offset}],now+offset);assert.equal(t.flights.length,1);assert.equal(t.flights[0].partial,true)});
 test('Flightradar screenshot fields PDANNACK and GLIM are separate; military glider type is recognised',()=>{
  assert.equal(classify({cn:'PDANNACK',aircraftType:'GLIM',sources:['ADSB']}).kind,'glider');
  assert.equal(classify({aircraftType:'Grob Viking T1'}).kind,'glider');

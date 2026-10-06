@@ -4,7 +4,7 @@ export const logDays=(end,count=7)=>Array.from({length:count},(_,i)=>new Date(Da
 export function filterLog(rows,{kind='glider',origin='all',status='all',query='',airfieldOrigin}={}){
  return rows.filter(f=>{
   const k=classify(f).kind;
-  return (kind==='all'||k===kind)&&(origin==='all'||(origin==='local'?f.origin===airfieldOrigin:f.origin!==airfieldOrigin))&&(status==='all'||(status==='landed'?!!f.landingAt:status==='lost'?f.status==='LOST'&&!f.landingAt:!f.landingAt&&f.status!=='LOST'))&&`${f.registration||''} ${f.cn||''} ${f.deviceId||''}`.toLowerCase().includes(query.trim().toLowerCase());
+  return (kind==='all'||kind==='gliders'&&['glider','probable'].includes(k)||k===kind)&&(origin==='all'||(origin==='local'?f.origin===airfieldOrigin:f.origin!==airfieldOrigin))&&(status==='all'||(status==='landed'?!!f.landingAt:status==='probable'?f.status==='PROBABLE_LANDING':status==='lost'?f.status==='LOST'&&!f.landingAt:!f.landingAt&&f.status!=='LOST'&&f.status!=='PROBABLE_LANDING'))&&`${f.registration||''} ${f.cn||''} ${f.deviceId||''}`.toLowerCase().includes(query.trim().toLowerCase());
  });
 }
 export function dailyTotals(rows,dates,origin){return dates.map(day=>{
@@ -14,6 +14,7 @@ export function dailyTotals(rows,dates,origin){return dates.map(day=>{
 
 export function localRecord(f,origin){return f.origin===origin&&(origin!=='PREDANNACK'||isPredannack(f));}
 export function periodDays(end,period='day'){
+ if(period==='recent')return logDays(end,7);
  const date=new Date(end+'T12:00:00Z');let start=new Date(date);
  if(period==='week')start.setUTCDate(start.getUTCDate()-((start.getUTCDay()+6)%7));
  if(period==='month')start.setUTCDate(1);
@@ -22,3 +23,5 @@ export function periodDays(end,period='day'){
 }
 export const completedAirTime=rows=>rows.filter(f=>f.landingAt&&!f.partial).reduce((n,f)=>n+flightDuration(f),0);
 export const launchCount=(rows,origin)=>rows.filter(f=>localRecord(f,origin)&&classify(f).kind==='glider'&&!f.partial&&f.departureConfirmed!==false).length;
+
+export const estimatedAirTime=rows=>rows.filter(f=>f.probableLandingAt&&!f.landingAt||f.partial&&f.landingAt).reduce((n,f)=>n+flightDuration(f),0);

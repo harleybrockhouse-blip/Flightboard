@@ -1,3 +1,4 @@
+import {repairActivity} from '../../lib/replay.mjs';
 import {AIRFIELDS} from '../../public/airfields.mjs';
 import {Tracker,dayKey} from '../../public/tracker.mjs';
 import {fetchTraffic} from '../../lib/traffic.mjs';
@@ -23,6 +24,8 @@ export const createCollector=(getStore=store,isEnabled=enabled,getFeed=fetchTraf
   tracker.flights=tracker.flights.filter(f=>(!f.landingAt&&!f.closedByCorrection&&!f.closedUnresolved)||Date.now()-f.takeoffAt<172800000);
   await s.setJSON('tracker',tracker.snapshot());
   await saveHistory(s,feed,now);
+  const recovery=await s.get('recovery-v11',{type:'json'})||{day:dayKey(now),index:1};if(recovery.day!==dayKey(now)){recovery.day=dayKey(now);recovery.index=1;}
+  if(recovery.index<=6){const date=dayKey(now-recovery.index*86400000);await repairActivity(s,cfg,[date],now);recovery.index++;await s.setJSON('recovery-v11',recovery);}
  }finally{await s.setJSON('collector-lease',{until:0},{onlyIfMatch:lease.etag});}
  return new Response(null,{status:204});
 };
